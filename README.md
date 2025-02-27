@@ -39,6 +39,10 @@ Run the following to view all available options:
 
     auto_subtitle --help
 
+Run the higlight caption task: 
+
+    python3.11 -m auto_subtitle.cli ./fresh-market-demo.mp4 --model tiny --subtitle_format ass -o .
+
 ## License
 
 This script is open-source and licensed under the MIT License. For more details, check the [LICENSE](LICENSE) file.
