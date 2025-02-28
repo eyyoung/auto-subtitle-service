@@ -1,6 +1,35 @@
 from dataclasses import dataclass
+from random import randint
 from typing import List, Dict
 import datetime
+
+# ASS file section templates
+ASS_SCRIPT_INFO_TEMPLATE = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 320
+PlayResY: 640
+ScaledBorderAndShadow: yes"""
+
+ASS_STYLES_SECTION_TEMPLATE = """
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+{styles}"""
+
+ASS_EVENTS_SECTION_TEMPLATE = """
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+{events}"""
+
+ASS_FILE_TEMPLATE = """{script_info}
+{styles_section}
+{events_section}"""
+
+# Event line templates
+ASS_DIALOGUE_TEMPLATE = "Dialogue: 0,{start},{end},Default,,0,0,0,,{text}"
+ASS_EFFECT_TEMPLATE = "{{\\t(0, {half}, \\fscx120\\fscy120)}}{{\\t({half}, {full}, \\fscx105\\fscy105)}}"
+ASS_HIGHLIGHT_TEMPLATE = "{effect_template}{{\c{color}}}{word}{{\\r}}"
+
+color_random = lambda: f"&H{randint(0, 255):02x}{randint(0, 255):02x}{randint(0, 255):02x}&"
 
 @dataclass
 class AssStyle:
@@ -25,34 +54,36 @@ class AssStyle:
     alignment: int = 2  # 2 = bottom center
     margin_l: int = 10
     margin_r: int = 10
-    margin_v: int = 60
+    margin_v: int = 160
     encoding: int = 1
 
     def to_ass_style(self) -> str:
-        return (
-            f"Style: {self.name},"
-            f"{self.font_name},"
-            f"{self.font_size},"
-            f"{self.primary_color},"
-            f"{self.secondary_color},"
-            f"{self.outline_color},"
-            f"{self.back_color},"
-            f"{1 if self.bold else 0},"
-            f"{1 if self.italic else 0},"
-            f"{1 if self.underline else 0},"
-            f"{1 if self.strikeout else 0},"
-            f"{self.scale_x},"
-            f"{self.scale_y},"
-            f"{self.spacing},"
-            f"{self.angle},"
-            f"{self.border_style},"
-            f"{self.outline},"
-            f"{self.shadow},"
-            f"{self.alignment},"
-            f"{self.margin_l},"
-            f"{self.margin_r},"
-            f"{self.margin_v},"
-            f"{self.encoding}"
+        style_template = "Style: {name},{font_name},{font_size},{primary_color},{secondary_color},{outline_color},{back_color},{bold},{italic},{underline},{strikeout},{scale_x},{scale_y},{spacing},{angle},{border_style},{outline},{shadow},{alignment},{margin_l},{margin_r},{margin_v},{encoding}"
+        
+        return style_template.format(
+            name=self.name,
+            font_name=self.font_name,
+            font_size=self.font_size,
+            primary_color=self.primary_color,
+            secondary_color=self.secondary_color,
+            outline_color=self.outline_color,
+            back_color=self.back_color,
+            bold=1 if self.bold else 0,
+            italic=1 if self.italic else 0,
+            underline=1 if self.underline else 0,
+            strikeout=1 if self.strikeout else 0,
+            scale_x=self.scale_x,
+            scale_y=self.scale_y,
+            spacing=self.spacing,
+            angle=self.angle,
+            border_style=self.border_style,
+            outline=self.outline,
+            shadow=self.shadow,
+            alignment=self.alignment,
+            margin_l=self.margin_l,
+            margin_r=self.margin_r,
+            margin_v=self.margin_v,
+            encoding=self.encoding
         )
 
 class AssGenerator:
@@ -88,26 +119,22 @@ class AssGenerator:
         return int(time * 100)
 
     def _create_ass_header(self, style_name: str = "default") -> str:
-        header = [
-            "[Script Info]",
-            "ScriptType: v4.00+",
-            "PlayResX: 320",
-            "PlayResY: 640",
-            "ScaledBorderAndShadow: yes",
-            "",
-            "[V4+ Styles]",
-            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding"
-        ]
+        # Generate styles string
+        styles_str = "\n".join(style.to_ass_style() for style in self.styles.values())
         
-        # Add all styles
-        for style in self.styles.values():
-            header.append(style.to_ass_style())
-            
-        header.extend(["", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"])
-        return "\n".join(header)
+        # Fill in the templates
+        styles_section = ASS_STYLES_SECTION_TEMPLATE.format(styles=styles_str)
+        
+        # Return the complete header (script info + styles section)
+        return ASS_FILE_TEMPLATE.format(
+            script_info=ASS_SCRIPT_INFO_TEMPLATE,
+            styles_section=styles_section,
+            events_section=ASS_EVENTS_SECTION_TEMPLATE.format(events="")
+        )
 
     def generate_ass(self, segments: List[Dict], style_name: str = "default") -> str:
-        ass_content = [self._create_ass_header(style_name)]
+        header = self._create_ass_header(style_name)
+        events = []
         
         for segment in segments:
             start_time = self._format_time(segment["start"])
@@ -122,8 +149,8 @@ class AssGenerator:
                 
                 # If no words timing available, just show the text normally
                 if not words:
-                    line = f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{text}"
-                    ass_content.append(line)
+                    line = ASS_DIALOGUE_TEMPLATE.format(start=start_time, end=end_time, text=text)
+                    events.append(line)
                     continue
 
                 # Get the full sentence first
@@ -137,35 +164,43 @@ class AssGenerator:
                         continue
                     
                     # Get the timing for this word
-                    word_start = self._format_time(word["start"])
-                    word_end = self._format_time(words[i + 1]["start"] if i < len(words) - 1 else segment["end"])
+                    wordStartTime = word["start"]
+                    wordEndTime = words[i + 1]["start"] if i < len(words) - 1 else segment["end"]
+                    word_start = self._format_time(wordStartTime)
+                    word_end = self._format_time(wordEndTime)
+                    fullTime = self._time_to_centiseconds(min(wordEndTime - wordStartTime, 100))
+                    halfTime = self._time_to_centiseconds(min(wordEndTime - wordStartTime, 100) / 2)
+
                     
                     # Split the full text into parts: before current word, current word, and after current word
                     words_list = full_text.split()
-                    current_word_pos = 0
-                    highlighted_text = ""
+                    highlighted_text = []
                     
-                    # Find the position of the current word
+                    # Build the text with highlighting
                     for j, w in enumerate(words_list):
                         if j < i:
-                            highlighted_text += w + " "
+                            highlighted_text.append(w)
                         elif j == i:
-                            highlighted_text += "{\\1c&H0000FF}" + w + "{\\r}"
-                            if j < len(words_list) - 1:
-                                highlighted_text += " "
+                            effectStr = ASS_EFFECT_TEMPLATE.format(half=halfTime,
+                                                                    full=fullTime)
+                            highlighted_text.append(ASS_HIGHLIGHT_TEMPLATE
+                                                    .format(word=w, 
+                                                            effect_template=effectStr, 
+                                                            color=color_random()))
                         else:
-                            highlighted_text += w
-                            if j < len(words_list) - 1:
-                                highlighted_text += " "
+                            highlighted_text.append(w)
                     
-                    print(f"Generated line {i}: {highlighted_text}")
+                    final_text = " ".join(highlighted_text)
+                    print(f"Generated line {i}: {final_text}")
                     
-                    line = f"Dialogue: 0,{word_start},{word_end},Default,,0,0,0,,{highlighted_text}"
-                    ass_content.append(line)
+                    line = ASS_DIALOGUE_TEMPLATE.format(start=word_start, end=word_end, text=final_text)
+                    events.append(line)
 
             else:
                 # Regular subtitle without word timing
-                line = f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{text}"
-                ass_content.append(line)
+                line = ASS_DIALOGUE_TEMPLATE.format(start=start_time, end=end_time, text=text)
+                events.append(line)
         
-        return "\n".join(ass_content)
+        # Replace the empty events section in the header with actual events
+        events_section = ASS_EVENTS_SECTION_TEMPLATE.format(events="\n".join(events))
+        return header.replace(ASS_EVENTS_SECTION_TEMPLATE.format(events=""), events_section)
