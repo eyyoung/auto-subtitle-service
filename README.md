@@ -120,6 +120,27 @@ The following environment variables can be configured in Railway:
 
 You can set these variables in the Railway dashboard under your project's "Variables" tab.
 
+### Handling Long Processing Times
+
+When processing longer videos, the default timeout of 30 seconds in Gunicorn might not be sufficient. The application is configured with a 300-second (5-minute) timeout to handle longer processing times. If your videos require even more processing time, you can adjust the timeout in the following files:
+
+1. **Dockerfile**:
+   ```
+   CMD gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300
+   ```
+
+2. **railway.json**:
+   ```json
+   "startCommand": "gunicorn app:app --timeout 300"
+   ```
+
+If you need to increase memory allocation for processing larger videos or using more complex models, you can adjust the resources in the Railway dashboard:
+
+1. Go to your project in the Railway dashboard
+2. Select your service
+3. Click on "Settings"
+4. Under "Resource Usage", increase the memory allocation as needed
+
 ## License
 
 This script is open-source and licensed under the MIT License. For more details, check the [LICENSE](LICENSE) file.
