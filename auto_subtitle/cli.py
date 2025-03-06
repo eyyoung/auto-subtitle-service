@@ -1,20 +1,91 @@
 import os
 import ffmpeg
-import whisper
 import argparse
 import warnings
 import tempfile
+import openai
+from dotenv import load_dotenv
 from .utils import filename, str2bool, write_srt
 from .ass_generator import AssGenerator
 
+# Load environment variables
+load_dotenv()
+
+# Set OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def transcribe_with_openai_api(audio_path, model_name="whisper-1", task="transcribe", language="auto"):
+    """Transcribe audio using OpenAI's Whisper API"""
+    try:
+        # Prepare parameters for API call
+        params = {
+            "model": model_name,
+            "response_format": "verbose_json"
+        }
+        
+        # Add language if specified and not auto
+        if language != "auto":
+            params["language"] = language
+        
+        # Set task (translate or transcribe)
+        if task == "translate":
+            # For translation, we always translate to English
+            params["response_format"] = "verbose_json"
+        
+        # Open the audio file
+        with open(audio_path, "rb") as audio_file:
+            # Call the OpenAI API
+            if task == "transcribe":
+                response = openai.audio.transcriptions.create(
+                    file=audio_file,
+                    **params
+                )
+            else:  # translate
+                response = openai.audio.translations.create(
+                    file=audio_file,
+                    **params
+                )
+        
+        # Convert response to dictionary if it's not already
+        if not isinstance(response, dict):
+            response = response.model_dump()
+        
+        # Process the response to match the format expected by our subtitle generator
+        # OpenAI API returns segments with start and end times
+        segments = []
+        
+        if "segments" in response:
+            # If the API already returns segments in the format we need
+            segments = response["segments"]
+        else:
+            # If we need to create segments from the response
+            # This is a simplified version - in a real implementation, 
+            # you might want to split the text into sentences or use other logic
+            segments = [
+                {
+                    "start": 0,
+                    "end": 10,  # Default duration if not provided
+                    "text": response.get("text", "")
+                }
+            ]
+        
+        # Return in the format expected by get_subtitles
+        return {
+            "segments": segments,
+            "text": response.get("text", "")
+        }
+    
+    except Exception as e:
+        print(f"Error in OpenAI API transcription: {str(e)}")
+        raise
 
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("video", nargs="+", type=str,
                         help="paths to video files to transcribe")
-    parser.add_argument("--model", default="small",
-                        choices=whisper.available_models(), help="name of the Whisper model to use")
+    parser.add_argument("--model", default="whisper-1",
+                        help="name of the OpenAI Whisper model to use (default: whisper-1)")
     parser.add_argument("--output_dir", "-o", type=str,
                         default=".", help="directory to save the outputs")
     parser.add_argument("--subtitle_format", type=str, default="ass",
@@ -41,24 +112,14 @@ def main():
     output_srt: bool = args.pop("output_srt")
     srt_only: bool = args.pop("srt_only")
     language: str = args.pop("language")
+    task: str = args.pop("task")
     
     os.makedirs(output_dir, exist_ok=True)
-
-    if model_name.endswith(".en"):
-        warnings.warn(
-            f"{model_name} is an English-only model, forcing English detection.")
-        args["language"] = "en"
-    # if translate task used and language argument is set, then use it
-    elif language != "auto":
-        args["language"] = language
     
-    args["word_timestamps"] = True
-        
-    model = whisper.load_model(model_name)
     audios = get_audio(args.pop("video"))
     subtitles = get_subtitles(
         audios, output_srt or srt_only, output_dir, subtitle_format, ass_style,
-        lambda audio_path: model.transcribe(audio_path, **args)
+        lambda audio_path: transcribe_with_openai_api(audio_path, model_name, task, language)
     )
 
     if srt_only:

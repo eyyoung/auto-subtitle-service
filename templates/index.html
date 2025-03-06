@@ -16,17 +16,9 @@
         <label for="video">Select Video File:</label>
         <input type="file" id="video" name="video" accept=".mp4,.avi,.mov,.mkv,.webm" required>
         
-        <label for="model">Whisper Model:</label>
+        <label for="model">Whisper API Model:</label>
         <select id="model" name="model">
-            <option value="tiny">tiny (fastest)</option>
-            <option value="tiny.en">tiny.en (English only)</option>
-            <option value="base">base</option>
-            <option value="base.en">base.en (English only)</option>
-            <option value="small">small</option>
-            <option value="small.en">small.en (English only)</option>
-            <option value="medium">medium</option>
-            <option value="medium.en">medium.en (English only)</option>
-            <option value="large">large (slowest, most accurate)</option>
+            <option value="whisper-1">whisper-1 (OpenAI's standard model)</option>
         </select>
         
         <label for="subtitle_format">Subtitle Format:</label>
@@ -69,8 +61,8 @@
     </form>
     
     <div class="note">
-        <p><strong>Note:</strong> Processing may take several minutes depending on the video length and model selected.</p>
-        <p>Larger models provide better accuracy but require more processing time.</p>
+        <p><strong>Note:</strong> Processing may take several minutes depending on the video length.</p>
+        <p><strong>Important:</strong> This application requires an OpenAI API key to be set in the environment variables.</p>
     </div>
 </body>
 </html>

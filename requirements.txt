@@ -1,5 +1,6 @@
-openai-whisper
+openai
 ffmpeg-python
 flask
 werkzeug
 gunicorn
+python-dotenv

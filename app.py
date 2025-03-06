@@ -1,11 +1,20 @@
 import os
 import tempfile
-import whisper
 import ffmpeg
+import gc
 from flask import Flask, request, jsonify, send_file, url_for, render_template
 from werkzeug.utils import secure_filename
 from auto_subtitle.utils import filename, write_srt
 from auto_subtitle.ass_generator import AssGenerator
+import openai
+from dotenv import load_dotenv
+import json
+
+# Load environment variables
+load_dotenv()
+
+# Set OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.path.join(tempfile.gettempdir(), 'auto_subtitle_uploads')
@@ -87,6 +96,71 @@ def create_subtitled_video(video_path, sub_path, output_dir, subtitle_format):
 
     return out_path
 
+def transcribe_with_openai_api(audio_path, model_name="whisper-1", task="transcribe", language="auto"):
+    """Transcribe audio using OpenAI's Whisper API"""
+    try:
+        # Prepare parameters for API call
+        params = {
+            "model": model_name,
+            "response_format": "verbose_json"
+        }
+        
+        # Add language if specified and not auto
+        if language != "auto":
+            params["language"] = language
+        
+        # Set task (translate or transcribe)
+        if task == "translate":
+            # For translation, we always translate to English
+            params["response_format"] = "verbose_json"
+        
+        # Open the audio file
+        with open(audio_path, "rb") as audio_file:
+            # Call the OpenAI API
+            if task == "transcribe":
+                response = openai.audio.transcriptions.create(
+                    file=audio_file,
+                    **params
+                )
+            else:  # translate
+                response = openai.audio.translations.create(
+                    file=audio_file,
+                    **params
+                )
+        
+        # Convert response to dictionary if it's not already
+        if not isinstance(response, dict):
+            response = response.model_dump()
+        
+        # Process the response to match the format expected by our subtitle generator
+        # OpenAI API returns segments with start and end times
+        segments = []
+        
+        if "segments" in response:
+            # If the API already returns segments in the format we need
+            segments = response["segments"]
+        else:
+            # If we need to create segments from the response
+            # This is a simplified version - in a real implementation, 
+            # you might want to split the text into sentences or use other logic
+            segments = [
+                {
+                    "start": 0,
+                    "end": 10,  # Default duration if not provided
+                    "text": response.get("text", "")
+                }
+            ]
+        
+        # Return in the format expected by get_subtitles
+        return {
+            "segments": segments,
+            "text": response.get("text", "")
+        }
+    
+    except Exception as e:
+        print(f"Error in OpenAI API transcription: {str(e)}")
+        raise
+
 @app.route('/subtitle', methods=['POST'])
 def subtitle_video():
     # Check if a file was uploaded
@@ -103,7 +177,7 @@ def subtitle_video():
         return jsonify({'error': f'File type not allowed. Allowed types: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
     
     # Get parameters from request
-    model_name = request.form.get('model', 'tiny')
+    model_name = request.form.get('model', 'whisper-1')  # Default to OpenAI's whisper-1 model
     subtitle_format = request.form.get('subtitle_format', 'ass')
     ass_style = request.form.get('ass_style', 'default')
     task = request.form.get('task', 'transcribe')
@@ -126,30 +200,17 @@ def subtitle_video():
     file.save(video_path)
     
     try:
-        # Load the Whisper model
-        model = whisper.load_model(model_name)
-        
-        # Prepare transcription arguments
-        transcribe_args = {
-            'task': task,
-            'word_timestamps': True
-        }
-        
-        # If language is specified and not auto, use it
-        if language != 'auto':
-            transcribe_args['language'] = language
-        
         # Extract audio
         audio_path = get_audio(video_path)
         
-        # Generate subtitles
+        # Generate subtitles using OpenAI's Whisper API
         sub_path = get_subtitles(
             video_path, 
             audio_path, 
             app.config['OUTPUT_FOLDER'], 
             subtitle_format, 
             ass_style,
-            lambda audio_path: model.transcribe(audio_path, **transcribe_args)
+            lambda audio_path: transcribe_with_openai_api(audio_path, model_name, task, language)
         )
         
         # If srt_only is True, return the subtitle file
@@ -178,9 +239,14 @@ def subtitle_video():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
-        # Clean up temporary files (optional, can be commented out for debugging)
+        # Clean up temporary files
         if os.path.exists(video_path):
             os.remove(video_path)
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+        
+        # Force garbage collection to free memory
+        gc.collect()
 
 @app.route('/', methods=['GET'])
 def index():
