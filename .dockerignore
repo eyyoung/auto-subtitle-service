@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.mp4
+videos/

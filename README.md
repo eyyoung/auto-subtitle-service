@@ -43,6 +43,83 @@ Run the higlight caption task:
 
     python3.11 -m auto_subtitle.cli ./fresh-market-demo.mp4 --model tiny --subtitle_format ass -o .
 
+## Flask API
+
+You can also use this service as a Flask web application with an API endpoint:
+
+```bash
+# Start the Flask server
+python app.py
+```
+
+This will start a web server at http://localhost:5000 with the following features:
+
+- Web interface at http://localhost:5000/ for uploading videos and generating subtitles
+- API endpoint at http://localhost:5000/subtitle for programmatic access
+
+### API Usage Example
+
+```bash
+# Using curl to send a request to the API
+curl -X POST -F "video=@/path/to/video.mp4" -F "model=tiny" -F "subtitle_format=ass" http://localhost:5000/subtitle -o subtitled_video.mp4
+```
+
+Available parameters:
+- `video`: The video file to process (required)
+- `model`: Whisper model to use (default: tiny)
+- `subtitle_format`: Format of subtitles, 'srt' or 'ass' (default: ass)
+- `ass_style`: Style for ASS subtitles, 'default' or 'highlight' (default: default)
+- `task`: 'transcribe' or 'translate' (default: transcribe)
+- `language`: Language code or 'auto' for auto-detection (default: auto)
+- `srt_only`: 'true' to get only subtitle file, 'false' to get video with subtitles (default: false)
+
+## Deployment to Railway
+
+This application is configured for easy deployment to [Railway](https://railway.app/). The following files are included for deployment:
+
+- `Procfile`: Specifies the start command for the web server
+- `runtime.txt`: Specifies Python 3.11 as the required runtime
+- `railway.json`: Contains Railway-specific configuration
+- `Dockerfile`: Provides container configuration with ffmpeg
+
+### Deployment Steps
+
+1. Install the Railway CLI:
+   ```bash
+   npm i -g @railway/cli
+   ```
+
+2. Login to your Railway account:
+   ```bash
+   railway login
+   ```
+
+3. Initialize your project:
+   ```bash
+   railway init
+   ```
+
+4. Deploy your application:
+   ```bash
+   railway up
+   ```
+
+5. Open your deployed application:
+   ```bash
+   railway open
+   ```
+
+The application will automatically use Python 3.11 as specified in the `runtime.txt` file, and the start command is defined in both the `Procfile` and `railway.json` files.
+
+### Environment Variables
+
+The following environment variables can be configured in Railway:
+
+- `PORT`: The port on which the application will run (default: 5000)
+- `PYTHONUNBUFFERED`: Set to 1 to ensure unbuffered Python output
+
+You can set these variables in the Railway dashboard under your project's "Variables" tab.
+
 ## License
 
 This script is open-source and licensed under the MIT License. For more details, check the [LICENSE](LICENSE) file.

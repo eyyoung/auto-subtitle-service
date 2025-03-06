@@ -26,7 +26,7 @@ ASS_FILE_TEMPLATE = """{script_info}
 
 # Event line templates
 ASS_DIALOGUE_TEMPLATE = "Dialogue: 0,{start},{end},Default,,0,0,0,,{text}"
-ASS_EFFECT_TEMPLATE = "{{\\t(0, {half}, \\fscx120\\fscy120)}}{{\\t({half}, {full}, \\fscx105\\fscy105)}}"
+ASS_EFFECT_TEMPLATE = "{{\\t(0, {half}, \\fscx125\\fscy125)}}{{\\t({half}, {full}, \\fscx105\\fscy105)}}"
 ASS_HIGHLIGHT_TEMPLATE = "{effect_template}{{\c{color}}}{word}{{\\r}}"
 
 color_random = lambda: f"&H{randint(0, 255):02x}{randint(0, 255):02x}{randint(0, 255):02x}&"
@@ -136,7 +136,63 @@ class AssGenerator:
         header = self._create_ass_header(style_name)
         events = []
         
+        # Preprocess segments to split long ones
+        processed_segments = []
         for segment in segments:
+            text = segment.get("text", "").strip()
+            
+            # If no words or text is short enough, keep as is
+            if "words" not in segment or not segment["words"] or len(text) <= 20:
+                processed_segments.append(segment)
+                continue
+            
+            # Split long segments based on words
+            words = segment["words"]
+            current_segment = {
+                "start": segment["start"],
+                "text": "",
+                "words": []
+            }
+            
+            char_count = 0
+            for i, word in enumerate(words):
+                word_text = word.get("word", "").strip()
+                if not word_text:
+                    continue
+                
+                # Check if adding this word would exceed the limit
+                if char_count + len(word_text) + (1 if char_count > 0 else 0) > 20 and char_count > 0:
+                    # Finalize current segment
+                    if current_segment["words"]:
+                        # Set end time to the start time of the next word
+                        current_segment["end"] = current_segment["words"][-1].get("end", segment["end"])
+                        processed_segments.append(current_segment)
+                    
+                    # Start a new segment
+                    current_segment = {
+                        "start": word["start"],
+                        "text": word_text,
+                        "words": [word.copy()]
+                    }
+                    char_count = len(word_text)
+                else:
+                    # Add word to current segment
+                    if char_count > 0:
+                        current_segment["text"] += " " + word_text
+                        char_count += len(word_text) + 1  # +1 for space
+                    else:
+                        current_segment["text"] = word_text
+                        char_count = len(word_text)
+                    
+                    current_segment["words"].append(word.copy())
+            
+            # Add the last segment if it has content
+            if current_segment["words"]:
+                current_segment["end"] = segment["end"]
+                processed_segments.append(current_segment)
+        
+        # Process the reorganized segments
+        for segment in processed_segments:
             start_time = self._format_time(segment["start"])
             end_time = self._format_time(segment["end"])
             text = segment.get("text", "").strip()
@@ -152,12 +208,12 @@ class AssGenerator:
                     line = ASS_DIALOGUE_TEMPLATE.format(start=start_time, end=end_time, text=text)
                     events.append(line)
                     continue
-
+                
                 # Get the full sentence first
                 full_text = " ".join(w.get("word", "").strip() for w in words if w.get("word", "").strip())
                 print(f"Full text: {full_text}")
-
-                # Process each word
+                
+                # Recalculate word timelines
                 for i, word in enumerate(words):
                     word_text = word.get("word", "").strip()
                     if not word_text:
@@ -165,12 +221,14 @@ class AssGenerator:
                     
                     # Get the timing for this word
                     wordStartTime = word["start"]
+                    # Calculate end time based on next word or segment end
                     wordEndTime = words[i + 1]["start"] if i < len(words) - 1 else segment["end"]
+                    word["end"] = wordEndTime  # Store end time for future reference
+                    
                     word_start = self._format_time(wordStartTime)
                     word_end = self._format_time(wordEndTime)
                     fullTime = self._time_to_centiseconds(min(wordEndTime - wordStartTime, 100))
                     halfTime = self._time_to_centiseconds(min(wordEndTime - wordStartTime, 100) / 2)
-
                     
                     # Split the full text into parts: before current word, current word, and after current word
                     words_list = full_text.split()
@@ -181,12 +239,12 @@ class AssGenerator:
                         if j < i:
                             highlighted_text.append(w)
                         elif j == i:
-                            effectStr = ASS_EFFECT_TEMPLATE.format(half=halfTime,
-                                                                    full=fullTime)
+                            effectStr = ASS_EFFECT_TEMPLATE.format(half=100,
+                                                                 full=200)
                             highlighted_text.append(ASS_HIGHLIGHT_TEMPLATE
-                                                    .format(word=w, 
-                                                            effect_template=effectStr, 
-                                                            color=color_random()))
+                                                 .format(word=w, 
+                                                         effect_template=effectStr, 
+                                                         color=color_random()))
                         else:
                             highlighted_text.append(w)
                     
@@ -195,7 +253,7 @@ class AssGenerator:
                     
                     line = ASS_DIALOGUE_TEMPLATE.format(start=word_start, end=word_end, text=final_text)
                     events.append(line)
-
+            
             else:
                 # Regular subtitle without word timing
                 line = ASS_DIALOGUE_TEMPLATE.format(start=start_time, end=end_time, text=text)

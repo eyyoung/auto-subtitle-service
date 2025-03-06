@@ -1,2 +1,5 @@
 openai-whisper
 ffmpeg-python
+flask
+werkzeug
+gunicorn

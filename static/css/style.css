@@ -1,0 +1,155 @@
+/* Dark theme styling */
+:root {
+    --bg-color: #121212;
+    --card-bg-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --accent-color: #6200ee;
+    --accent-hover: #7c4dff;
+    --secondary-text: #a0a0a0;
+    --border-color: #333333;
+    --input-bg: #2a2a2a;
+    --success-color: #4caf50;
+    --success-hover: #388e3c;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+h1 {
+    color: var(--text-color);
+    text-align: center;
+    margin-bottom: 30px;
+    font-weight: 300;
+    font-size: 2.5em;
+}
+
+form {
+    background-color: var(--card-bg-color);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    margin-bottom: 30px;
+}
+
+label {
+    display: block;
+    margin: 15px 0 8px;
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+select, input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    box-sizing: border-box;
+}
+
+input[type="file"] {
+    padding: 8px;
+    background-color: var(--input-bg);
+    border: 1px dashed var(--border-color);
+}
+
+input[type="file"]::-webkit-file-upload-button {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+input[type="file"]::-webkit-file-upload-button:hover {
+    background-color: var(--accent-hover);
+}
+
+input[type="submit"] {
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 12px 20px;
+    width: 100%;
+    border-radius: 4px;
+    font-size: 1.1em;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+input[type="submit"]:hover {
+    background-color: var(--success-hover);
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    margin: 15px 0;
+}
+
+.checkbox-container input[type="checkbox"] {
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
+    position: relative;
+    top: 0;
+}
+
+.checkbox-container label {
+    display: inline;
+    margin: 0;
+    line-height: 18px;
+    cursor: pointer;
+}
+
+.note {
+    font-size: 0.9em;
+    color: var(--secondary-text);
+    margin-top: 20px;
+    padding: 15px;
+    background-color: var(--card-bg-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.logo {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.logo span {
+    font-size: 2.8em;
+    font-weight: 700;
+    background: linear-gradient(45deg, var(--accent-color), var(--accent-hover));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+    }
+    
+    form {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 2em;
+    }
+}
